@@ -165,5 +165,4 @@ def test_lambda_invocation(tf_output, localstack_session):
         "An error occurred (UnrecognizedClientException) when calling the "
         "DescribeCreateAccountStatus operation:"
     )
-    breakpoint()
     assert error_msg in response_payload["errorMessage"]
