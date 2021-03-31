@@ -111,8 +111,8 @@ def main(new_account_id, company_name, cc_list):
             language="en",
             issueType="customer-service",
         )
-    except botocore.exceptions.ClientError as err:
-        raise SupportCaseError(err) from err
+    except botocore.exceptions.ClientError as create_case_err:
+        raise SupportCaseError(create_case_err) from create_case_err
 
     # Extract case ID from response.
     case_id = response["caseId"]
@@ -123,13 +123,13 @@ def main(new_account_id, company_name, cc_list):
     # particular, the display ID.
     try:
         case = client.describe_cases(caseIdList=[case_id])
-    except botocore.exceptions.ClientError as err:
-        raise SupportCaseError(err) from err
+    except botocore.exceptions.ClientError as describe_case_err:
+        raise SupportCaseError(describe_case_err) from describe_case_err
 
     try:
         display_id = case["cases"][0]["displayId"]
-    except KeyError:
-        raise SupportCaseError(err) from err
+    except KeyError as key_err:
+        raise SupportCaseError(key_err) from key_err
 
     LOG.info(f"Case {display_id} opened")
     return 0
