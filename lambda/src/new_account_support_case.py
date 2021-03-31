@@ -126,10 +126,10 @@ def main(new_account_id, company_name, cc_list):
     except botocore.exceptions.ClientError as err:
         raise SupportCaseError(err) from err
 
-    if "cases" in case and len(case["cases"]) > 0 and "displayId" in case["cases"][0]:
+    try:
         display_id = case["cases"][0]["displayId"]
-    else:
-        raise SupportCaseError("Unable to extract 'displayId' from case info")
+    except KeyError:
+        raise SupportCaseError(err) from err
 
     LOG.info(f"Case {display_id} opened")
     return 0

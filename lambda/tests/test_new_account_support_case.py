@@ -101,8 +101,8 @@ def test_main_func_valid_arguments(support_client):
     assert return_code == 0
 
     cases = support_client.describe_cases()
-    for case in cases['cases']:
-        if company_name in case['subject'] and case['ccEmailAddresses'][0] == cc_list:
+    for case in cases["cases"]:
+        if company_name in case["subject"] and case["ccEmailAddresses"][0] == cc_list:
             break
     else:
         assert False
@@ -150,8 +150,8 @@ def test_lambda_handler_valid_arguments(
     assert not lambda_func.lambda_handler("mocked_event", lambda_context)
 
     cases = support_client.describe_cases()
-    for case in cases['cases']:
-        if company_name in case['subject'] and case['ccEmailAddresses'][0] == cc_list:
+    for case in cases["cases"]:
+        if company_name in case["subject"] and case["ccEmailAddresses"][0] == cc_list:
             break
     else:
         assert False
