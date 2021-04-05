@@ -7,12 +7,28 @@ locals {
   name = "new_account_support_case_${random_string.id.result}"
 }
 
+
+data "aws_partition" "current" {}
+
+data "aws_iam_policy_document" "lambda" {
+  statement {
+    actions = [
+      "organizations:DescribeCreateAccountStatus"
+    ]
+
+    resources = [
+      "*",
+    ]
+  }
+}
+
 module "lambda" {
   source = "git::https://github.com/plus3it/terraform-aws-lambda.git?ref=v1.2.0"
 
   function_name = local.name
   description   = "Create new IAM Account Role"
   handler       = "new_account_support_case.lambda_handler"
+  policy        = data.aws_iam_policy_document.lambda
   runtime       = "python3.8"
   source_path   = "${path.module}/lambda/src"
   timeout       = 300
