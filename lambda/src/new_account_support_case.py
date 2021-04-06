@@ -211,13 +211,13 @@ Enable Enterprise support for a new account.
 NOTE:  Use the environment variable 'LOG_LEVEL' to set the desired log level
 ('error', 'warning', 'info' or 'debug').  The default level is 'info'.""",
         )
-        parser.add_argument_group(
+        parser.add_argument(
             "--subject",
             required=True,
             type=str,
             help="Text for 'Subject' field of the communication sent to support.",
         )
-        parser.add_argument_group(
+        parser.add_argument(
             "--communication_body",
             required=True,
             type=str,
