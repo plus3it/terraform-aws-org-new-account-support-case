@@ -167,7 +167,7 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
     if not subject:
         msg = (
             "Environment variable 'SUBJECT' must provide the 'Subject' text "
-            "for the email sent to support."
+            "for the communication sent to support."
         )
         LOG.error(msg)
         raise SupportCaseInvalidArgumentsError(msg)
@@ -175,7 +175,7 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
     if not communication_body:
         msg = (
             "Environment variable 'COMMUNICATION_BODY' must provide the "
-            "body of the email sent to support."
+            "body of the communication sent to support."
         )
         LOG.error(msg)
         raise SupportCaseInvalidArgumentsError(msg)
@@ -215,13 +215,13 @@ NOTE:  Use the environment variable 'LOG_LEVEL' to set the desired log level
             "--subject",
             required=True,
             type=str,
-            help="Text for 'Subject' field of the email sent to support.",
+            help="Text for 'Subject' field of the communication sent to support.",
         )
         parser.add_argument_group(
             "--communication_body",
             required=True,
             type=str,
-            help="Text for body of the email sent to support.",
+            help="Text for body of the communication sent to support.",
         )
         parser.add_argument(
             "--cc_list",

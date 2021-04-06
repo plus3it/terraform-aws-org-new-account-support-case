@@ -3,7 +3,7 @@ variable "cc_list" {
   type        = string
 }
 variable "communication_body" {
-  description = "Text for body of the email sent to support.  The variable 'account_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces."
+  description = "Text for body of the communication sent to support.  The variable 'account_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces."
   type        = string
 }
 variable "log_level" {
@@ -12,6 +12,6 @@ variable "log_level" {
   type        = string
 }
 variable "subject" {
-  description = "Text for 'Subject' field of the email sent to support.  The variable 'account_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces."
+  description = "Text for 'Subject' field of the communication sent to support.  The variable 'account_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces."
   type        = string
 }

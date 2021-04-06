@@ -178,7 +178,7 @@ def test_lambda_handler_missing_subject(lambda_context, monkeypatch, mock_event)
         lambda_func.lambda_handler(mock_event, lambda_context)
     assert (
         "Environment variable 'SUBJECT' must provide the 'Subject' text for "
-        "the email sent to support"
+        "the communication sent to support"
     ) in str(exc.value)
 
 
@@ -193,7 +193,7 @@ def test_lambda_handler_missing_communication_body(
         lambda_func.lambda_handler(mock_event, lambda_context)
     assert (
         "Environment variable 'COMMUNICATION_BODY' must provide the body of "
-        "the email sent to support"
+        "the communication sent to support"
     ) in str(exc.value)
 
 
