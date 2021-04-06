@@ -13,7 +13,9 @@ data "aws_partition" "current" {}
 data "aws_iam_policy_document" "lambda" {
   statement {
     actions = [
-      "organizations:DescribeCreateAccountStatus"
+      "organizations:DescribeCreateAccountStatus",
+      "support:CreateCase",
+      "support:DescribeCase"
     ]
 
     resources = [
