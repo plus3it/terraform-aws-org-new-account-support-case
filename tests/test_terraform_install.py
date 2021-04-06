@@ -86,8 +86,9 @@ def tf_output(config_path):
     tf_test.setup(extra_files=[str(Path(Path.cwd() / "tests" / "localstack.tf"))])
 
     tf_vars = {
-        "company_name": "Acme",
         "cc_list": "foo.com,bar.com",
+        "subject": "Add a new account for Acme",
+        "communication_body": "Please add this account to Enterprise support",
     }
 
     try:

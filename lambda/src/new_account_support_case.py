@@ -2,6 +2,7 @@
 """Enable Enterprise support on a new account."""
 from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import os
+from string import Template
 import sys
 import time
 
@@ -86,27 +87,32 @@ class SupportCaseError(Exception):
     """Error creating or extracting details for support case."""
 
 
-def main(new_account_id, company_name, cc_list):
+def template_to_string(template, account_id):
+    """Replace account_id variable in string with actual value."""
+    if "$account_id" in template or "${account_id}" in template:
+        try:
+            return Template(template).substitute(account_id=account_id)
+        except KeyError as err:
+            raise SupportCaseError(
+                f"Unexpected variable '{err}' found in '{template}'"
+            ) from err
+    return template
+
+
+def main(account_id, cc_list, subject, communication_body):
     """Create an Enterprise support case and extract the display ID."""
-    # Prepare some of the fields needed for the create_case() call.
-    case_subject = (
-        f"Add new account to {company_name} Enterprise support: {new_account_id}"
-    )
-    case_communication_body = (
-        f"Hi AWS, please add this account to Enterprise support and add tax "
-        f"exemption (see the Tax Exemption letter under the payer account): "
-        f"{new_account_id}"
-    )
+    subject = template_to_string(subject, account_id)
+    communication_body = template_to_string(communication_body, account_id)
 
     # Create the Enterprise support case.
     client = boto3.client("support")
     try:
         response = client.create_case(
-            subject=case_subject,
+            subject=subject,
             severityCode="low",
             categoryCode="other-account-issues",
             serviceCode="customer-account",
-            communicationBody=case_communication_body,
+            communicationBody=communication_body,
             ccEmailAddresses=[cc_list],
             language="en",
             issueType="customer-service",
@@ -138,27 +144,38 @@ def main(new_account_id, company_name, cc_list):
 @LOG.inject_lambda_context(log_event=True)
 def lambda_handler(event, context):  # pylint: disable=unused-argument
     """Entry point if script called by AWS Lamdba."""
-    # Required:  Name of company requesting new account.
-    company_name = os.environ.get("COMPANY_NAME")
-
-    # Required:  Comma-separated list of email addresses to CC on this case.
     cc_list = os.environ.get("CC_LIST")
-
-    LOG.info({"COMPANY_NAME": company_name, "CC_LIST": cc_list})
+    communication_body = os.environ.get("COMMUNICATION_BODY")
+    subject = os.environ.get("SUBJECT")
+    LOG.info(
+        {
+            "CC_LIST": cc_list,
+            "COMMUNICATION_BODY": communication_body,
+            "SUBJECT": subject,
+        }
+    )
 
     # Check for missing requirement environment variables.
-    if not company_name:
-        msg = (
-            "Environment variable 'COMPANY_NAME' must provide "
-            "the name of the company requesting new account."
-        )
-        LOG.error(msg)
-        raise SupportCaseInvalidArgumentsError(msg)
-
     if not cc_list:
         msg = (
             "Environment variable 'CC_LIST' must provide at least one "
             "email address to CC on this case."
+        )
+        LOG.error(msg)
+        raise SupportCaseInvalidArgumentsError(msg)
+
+    if not subject:
+        msg = (
+            "Environment variable 'SUBJECT' must provide the 'Subject' text "
+            "for the email sent to support."
+        )
+        LOG.error(msg)
+        raise SupportCaseInvalidArgumentsError(msg)
+
+    if not communication_body:
+        msg = (
+            "Environment variable 'COMMUNICATION_BODY' must provide the "
+            "body of the email sent to support."
         )
         LOG.error(msg)
         raise SupportCaseInvalidArgumentsError(msg)
@@ -173,7 +190,7 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
         raise
 
     try:
-        main(account_id, company_name, cc_list)
+        main(account_id, cc_list, subject, communication_body)
     except SupportCaseInvalidArgumentsError as err:
         LOG.error({"failure": err})
         raise
@@ -194,15 +211,19 @@ Enable Enterprise support for a new account.
 NOTE:  Use the environment variable 'LOG_LEVEL' to set the desired log level
 ('error', 'warning', 'info' or 'debug').  The default level is 'info'.""",
         )
-
-        required_args = parser.add_argument_group("required named arguments")
-        required_args.add_argument(
-            "--company_name",
+        parser.add_argument_group(
+            "--subject",
             required=True,
             type=str,
-            help="Name of company requesting new account.",
+            help="Text for 'Subject' field of the email sent to support.",
         )
-        required_args.add_argument(
+        parser.add_argument_group(
+            "--communication_body",
+            required=True,
+            type=str,
+            help="Text for body of the email sent to support.",
+        )
+        parser.add_argument(
             "--cc_list",
             required=True,
             type=str,
@@ -211,8 +232,8 @@ NOTE:  Use the environment variable 'LOG_LEVEL' to set the desired log level
                 "least one email address is required."
             ),
         )
-        required_args.add_argument(
-            "--new_account_id",
+        parser.add_argument(
+            "--account_id",
             required=True,
             type=str,
             help="Account ID for account being added to Enterprise support.",

@@ -92,7 +92,7 @@ def org_client(aws_credentials):
 def mock_event(org_client):
     """Create an event used as an argument to the Lambda handler."""
     org_client.create_organization(FeatureSet="ALL")
-    account_id = org_client.create_account(
+    create_account_id = org_client.create_account(
         AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL
     )["CreateAccountStatus"]["Id"]
     return {
@@ -109,55 +109,91 @@ def mock_event(org_client):
             "eventSource": "organizations.amazonaws.com",
             "responseElements": {
                 "createAccountStatus": {
-                    "id": account_id,
+                    "id": create_account_id,
                 }
             },
         },
     }
 
 
+@pytest.fixture(scope="function")
+def account_id(org_client, mock_event):
+    """Return the account_id created for the new account in the org."""
+    org = boto3.client("organizations")
+    account_status_id = mock_event["detail"]["responseElements"]["createAccountStatus"][
+        "id"
+    ]
+    account_status = org.describe_create_account_status(
+        CreateAccountRequestId=account_status_id
+    )
+    return account_status["CreateAccountStatus"]["AccountId"]
+
+
 def test_main_func_valid_arguments(support_client):
     """Test use of valid arguments for main()."""
-    # Generate some random string for the company name,
-    company_name = str(uuid.uuid4())
     cc_list = "foo.com, foobar.com"
+    subject = str(uuid.uuid4())
+    communication_body = str(uuid.uuid4())
 
     return_code = lambda_func.main(
-        new_account_id=ACCOUNT_ID,
-        company_name=company_name,
+        account_id=ACCOUNT_ID,
         cc_list=cc_list,
+        subject=subject,
+        communication_body=communication_body,
     )
     assert return_code == 0
 
     cases = support_client.describe_cases()
     for case in cases["cases"]:
-        if company_name in case["subject"] and case["ccEmailAddresses"][0] == cc_list:
+        if (
+            subject == case["subject"]
+            and cc_list == case["ccEmailAddresses"][0]
+            and communication_body
+            == case["recentCommunications"]["communications"][0]["body"]
+        ):
             break
     else:
         assert False
 
 
-def test_lambda_handler_missing_company_name(lambda_context, monkeypatch):
-    """Invoke the lambda handler with no company name."""
-    monkeypatch.delenv("COMPANY_NAME", raising=False)
-    monkeypatch.setenv("CC_LIST", "foo.com")
-    with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
-        lambda_func.lambda_handler("mocked_event", lambda_context)
-    assert (
-        "Environment variable 'COMPANY_NAME' must provide the name of the "
-        "company requesting new account"
-    ) in str(exc.value)
-
-
-def test_lambda_handler_missing_cc_list(lambda_context, monkeypatch):
+def test_lambda_handler_missing_cc_list(lambda_context, monkeypatch, mock_event):
     """Invoke the lambda handler with no CC List."""
-    monkeypatch.setenv("COMPANY_NAME", "TEST CASE--Please ignore")
     monkeypatch.delenv("CC_LIST", raising=False)
+    monkeypatch.setenv("SUBJECT", "TEST CASE--Please ignore")
+    monkeypatch.setenv("COMMUNICATION_BODY", "Please support this account.")
     with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
-        lambda_func.lambda_handler("mocked_event", lambda_context)
+        lambda_func.lambda_handler(mock_event, lambda_context)
     assert (
         "Environment variable 'CC_LIST' must provide at least one email "
         "address to CC on this case"
+    ) in str(exc.value)
+
+
+def test_lambda_handler_missing_subject(lambda_context, monkeypatch, mock_event):
+    """Invoke the lambda handler with no subject."""
+    monkeypatch.setenv("CC_LIST", "foo.com")
+    monkeypatch.delenv("SUBJECT", raising=False)
+    monkeypatch.setenv("COMMUNICATION_BODY", "Please support this account.")
+    with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
+        lambda_func.lambda_handler(mock_event, lambda_context)
+    assert (
+        "Environment variable 'SUBJECT' must provide the 'Subject' text for "
+        "the email sent to support"
+    ) in str(exc.value)
+
+
+def test_lambda_handler_missing_communication_body(
+    lambda_context, monkeypatch, mock_event
+):
+    """Invoke the lambda handler with no subject."""
+    monkeypatch.setenv("CC_LIST", "foo.com")
+    monkeypatch.setenv("SUBJECT", "TEST CASE--Please ignore")
+    monkeypatch.delenv("COMMUNICATION_BODY", raising=False)
+    with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
+        lambda_func.lambda_handler(mock_event, lambda_context)
+    assert (
+        "Environment variable 'COMMUNICATION_BODY' must provide the body of "
+        "the email sent to support"
     ) in str(exc.value)
 
 
@@ -165,19 +201,55 @@ def test_lambda_handler_valid_arguments(
     lambda_context, iam_client, support_client, monkeypatch, mock_event
 ):
     """Invoke the lambda handler with only valid arguments."""
-    # Generate some random string for the company name,
-    company_name = str(uuid.uuid4())
     cc_list = "bar.com"
+    subject = str(uuid.uuid4())
+    communication_body = str(uuid.uuid4())
 
-    monkeypatch.setenv("COMPANY_NAME", company_name)
     monkeypatch.setenv("CC_LIST", cc_list)
+    monkeypatch.setenv("SUBJECT", subject)
+    monkeypatch.setenv("COMMUNICATION_BODY", communication_body)
     # The lambda function doesn't return anything, but will generate
     # an exception for failure.  So returning nothing is considered success.
     assert not lambda_func.lambda_handler(mock_event, lambda_context)
 
     cases = support_client.describe_cases()
     for case in cases["cases"]:
-        if company_name in case["subject"] and case["ccEmailAddresses"][0] == cc_list:
+        if (
+            subject == case["subject"]
+            and cc_list == case["ccEmailAddresses"][0]
+            and communication_body
+            == case["recentCommunications"]["communications"][0]["body"]
+        ):
+            break
+    else:
+        assert False
+
+
+def test_lambda_handler_envvars_with_account_id(
+    lambda_context,
+    iam_client,
+    support_client,
+    monkeypatch,
+    mock_event,
+    account_id,
+):  # pylint: disable=too-many-arguments
+    """Invoke the lambda handler with account_id variable in envvars."""
+    wild_card = str(uuid.uuid4())
+
+    monkeypatch.setenv("CC_LIST", "bar.com")
+    monkeypatch.setenv("SUBJECT", f"{wild_card} with $account_id")
+    monkeypatch.setenv(
+        "COMMUNICATION_BODY", f"Email body {wild_card} with ${{account_id}}"
+    )
+    assert not lambda_func.lambda_handler(mock_event, lambda_context)
+
+    cases = support_client.describe_cases()
+    for case in cases["cases"]:
+        if (
+            case["subject"] == f"{wild_card} with {account_id}"
+            and case["recentCommunications"]["communications"][0]["body"]
+            == f"Email body {wild_card} with {account_id}"
+        ):
             break
     else:
         assert False

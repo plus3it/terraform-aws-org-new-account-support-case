@@ -37,9 +37,10 @@ module "lambda" {
 
   environment = {
     variables = {
-      COMPANY_NAME = var.company_name
-      CC_LIST      = var.cc_list
-      LOG_LEVEL    = var.log_level
+      CC_LIST            = var.cc_list
+      COMMUNICATION_BODY = var.communication_body
+      LOG_LEVEL          = var.log_level
+      SUBJECT            = var.subject
     }
   }
 }
