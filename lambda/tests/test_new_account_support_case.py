@@ -3,6 +3,7 @@
 Neither LocalStack nor moto_server support the "support" service,
 so testing is very minimal.
 """
+from datetime import datetime
 import os
 import uuid
 
@@ -10,11 +11,14 @@ import pytest
 import boto3
 from moto import mock_iam
 from moto import mock_support
+from moto import mock_organizations
 from moto.core import ACCOUNT_ID
 
 import new_account_support_case as lambda_func
 
 AWS_REGION = os.getenv("AWS_REGION", default="aws-global")
+MOCK_ORG_NAME = "test_account"
+MOCK_ORG_EMAIL = f"{MOCK_ORG_NAME}@mock.org"
 
 
 @pytest.fixture
@@ -37,7 +41,7 @@ def lambda_context():
 
 
 @pytest.fixture(scope="function")
-def aws_credentials(tmpdir):
+def aws_credentials(tmpdir, monkeypatch):
     """Create mocked AWS credentials for moto.
 
     In addition to using the aws_credentials fixture, the test functions
@@ -52,15 +56,15 @@ def aws_credentials(tmpdir):
     ]
     path = tmpdir.join("aws_test_creds")
     path.write("\n".join(aws_creds))
-    os.environ["AWS_SHARED_CREDENTIALS_FILE"] = str(path)
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(path))
 
     # Ensure that any existing environment variables are overridden with
     # 'mock' values.
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_PROFILE"] = "testing"  # Not standard, but in use locally.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_PROFILE", "testing")  # Not standard, but in use locally.
 
 
 @pytest.fixture(scope="function")
@@ -78,13 +82,38 @@ def support_client(aws_credentials):
 
 
 @pytest.fixture(scope="function")
-def monkeypatch_get_account_id(monkeypatch):
-    """Mock get_account_id() to return a fake account ID."""
+def org_client(aws_credentials):
+    """Yield a mock organization that will not affect a real AWS account."""
+    with mock_organizations():
+        yield boto3.client("organizations", region_name=AWS_REGION)
 
-    def mock_get_account_id(event):  # pylint: disable=unused-argument
-        return ACCOUNT_ID
 
-    monkeypatch.setattr(lambda_func, "get_account_id", mock_get_account_id)
+@pytest.fixture(scope="function")
+def mock_event(org_client):
+    """Create an event used as an argument to the Lambda handler."""
+    org_client.create_organization(FeatureSet="ALL")
+    account_id = org_client.create_account(
+        AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL
+    )["CreateAccountStatus"]["Id"]
+    return {
+        "version": "0",
+        "id": str(uuid.uuid4()),
+        "detail-type": "AWS API Call via CloudTrail",
+        "source": "aws.organizations",
+        "account": "222222222222",
+        "time": datetime.now().isoformat(),
+        "region": "us-east-1",
+        "resources": [],
+        "detail": {
+            "eventName": "CreateAccount",
+            "eventSource": "organizations.amazonaws.com",
+            "responseElements": {
+                "createAccountStatus": {
+                    "id": account_id,
+                }
+            },
+        },
+    }
 
 
 def test_main_func_valid_arguments(support_client):
@@ -108,10 +137,10 @@ def test_main_func_valid_arguments(support_client):
         assert False
 
 
-def test_lambda_handler_missing_company_name(lambda_context):
+def test_lambda_handler_missing_company_name(lambda_context, monkeypatch):
     """Invoke the lambda handler with no company name."""
-    os.environ["COMPANY_NAME"] = ""
-    os.environ["CC_LIST"] = "foo.com"
+    monkeypatch.delenv("COMPANY_NAME", raising=False)
+    monkeypatch.setenv("CC_LIST", "foo.com")
     with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
         lambda_func.lambda_handler("mocked_event", lambda_context)
     assert (
@@ -120,10 +149,10 @@ def test_lambda_handler_missing_company_name(lambda_context):
     ) in str(exc.value)
 
 
-def test_lambda_handler_missing_cc_list(lambda_context):
+def test_lambda_handler_missing_cc_list(lambda_context, monkeypatch):
     """Invoke the lambda handler with no CC List."""
-    os.environ["COMPANY_NAME"] = "TEST CASE--Please ignore"
-    os.environ["CC_LIST"] = ""
+    monkeypatch.setenv("COMPANY_NAME", "TEST CASE--Please ignore")
+    monkeypatch.delenv("CC_LIST", raising=False)
     with pytest.raises(lambda_func.SupportCaseInvalidArgumentsError) as exc:
         lambda_func.lambda_handler("mocked_event", lambda_context)
     assert (
@@ -133,21 +162,18 @@ def test_lambda_handler_missing_cc_list(lambda_context):
 
 
 def test_lambda_handler_valid_arguments(
-    lambda_context,
-    iam_client,
-    support_client,
-    monkeypatch_get_account_id,
+    lambda_context, iam_client, support_client, monkeypatch, mock_event
 ):
     """Invoke the lambda handler with only valid arguments."""
     # Generate some random string for the company name,
     company_name = str(uuid.uuid4())
     cc_list = "bar.com"
 
-    os.environ["COMPANY_NAME"] = company_name
-    os.environ["CC_LIST"] = cc_list
+    monkeypatch.setenv("COMPANY_NAME", company_name)
+    monkeypatch.setenv("CC_LIST", cc_list)
     # The lambda function doesn't return anything, but will generate
     # an exception for failure.  So returning nothing is considered success.
-    assert not lambda_func.lambda_handler("mocked_event", lambda_context)
+    assert not lambda_func.lambda_handler(mock_event, lambda_context)
 
     cases = support_client.describe_cases()
     for case in cases["cases"]:
