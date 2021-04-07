@@ -89,13 +89,12 @@ class SupportCaseError(Exception):
 
 def template_to_string(template, account_id):
     """Replace account_id variable in string with actual value."""
-    if "$account_id" in template or "${account_id}" in template:
-        try:
-            return Template(template).substitute(account_id=account_id)
-        except KeyError as err:
-            raise SupportCaseError(
-                f"Unexpected variable '{err}' found in '{template}'"
-            ) from err
+    try:
+        return Template(template).substitute(account_id=account_id)
+    except KeyError as err:
+        raise SupportCaseError(
+            f"Unexpected variable {err} found in '{template}'"
+        ) from err
     return template
 
 
@@ -191,7 +190,7 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
 
     try:
         main(account_id, cc_list, subject, communication_body)
-    except SupportCaseInvalidArgumentsError as err:
+    except (SupportCaseInvalidArgumentsError, SupportCaseError) as err:
         LOG.error({"failure": err})
         raise
     except Exception:

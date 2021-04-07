@@ -253,3 +253,33 @@ def test_lambda_handler_envvars_with_account_id(
             break
     else:
         assert False
+
+
+def test_lambda_handler_envvars_with_bad_vars(
+    lambda_context,
+    iam_client,
+    support_client,
+    monkeypatch,
+    mock_event,
+    account_id,
+):  # pylint: disable=too-many-arguments
+    """Invoke the lambda handler with account_id variable in envvars."""
+    test_subject = "Subject with $unknown_var"
+    monkeypatch.setenv("CC_LIST", "bar.com")
+    monkeypatch.setenv("SUBJECT", test_subject)
+    monkeypatch.setenv("COMMUNICATION_BODY", "Email body")
+    with pytest.raises(lambda_func.SupportCaseError) as exc:
+        lambda_func.lambda_handler(mock_event, lambda_context)
+    assert f"Unexpected variable 'unknown_var' found in '{test_subject}'" in str(
+        exc.value
+    )
+
+    test_body = "Email body with $account_id and $unexpected_var"
+    monkeypatch.setenv("CC_LIST", "bar.com")
+    monkeypatch.setenv("SUBJECT", "Test subject")
+    monkeypatch.setenv("COMMUNICATION_BODY", test_body)
+    with pytest.raises(lambda_func.SupportCaseError) as exc:
+        lambda_func.lambda_handler(mock_event, lambda_context)
+    assert f"Unexpected variable 'unexpected_var' found in '{test_body}'" in str(
+        exc.value
+    )
