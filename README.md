@@ -40,7 +40,8 @@ make localstack/clean
 | Name | Description | Type | Default | Required |
 |------|-------------|------|---------|:--------:|
 | cc\_list | Comma-separated list of email addresses to CC on this case.  At least one email address is required. | `string` | n/a | yes |
-| company\_name | Name of company requesting Enterprise Support of a new account. | `string` | n/a | yes |
+| communication\_body | Text for body of the communication sent to support.  The variable 'account\_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces. | `string` | n/a | yes |
+| subject | Text for 'Subject' field of the communication sent to support.  The variable 'account\_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces. | `string` | n/a | yes |
 | log\_level | Log level of the lambda output, one of: debug, info, warning, error, critical | `string` | `"info"` | no |
 
 ## Outputs

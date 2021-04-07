@@ -12,6 +12,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/) and this p
 
 **Summary**:
         
+*   Add two more environment variables for Lambda:  SUBJECT and
+    COMMUNICATION_BODY.  Permit the variable 'account_id' to be used within 
+    the text of those two new environment variables.
 *   Updated the Terraform configuration to add the policy document to
     provide the Lambda with permissions for 
     organizations:DescribeCreateAccountStatus.
