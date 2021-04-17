@@ -25,6 +25,11 @@ LOG = Logger(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 
+LOCALSTACK_IP = os.getenv("LOCALSTACK_HOSTNAME")
+ORG_ENDPOINT = "http://localstack:4615" if LOCALSTACK_IP else None
+EDGE_ENDPOINT = "http://localstack:4566" if LOCALSTACK_IP else None
+
+
 ### Classes and functions specific to the Lambda event handler itself.
 
 
@@ -41,9 +46,9 @@ def get_new_account_id(event):
     )
     LOG.info({"create_account_status_id": create_account_status_id})
 
-    org = boto3.client("organizations")
+    org_client = boto3.client("organizations", endpoint_url=ORG_ENDPOINT)
     while True:
-        account_status = org.describe_create_account_status(
+        account_status = org_client.describe_create_account_status(
             CreateAccountRequestId=create_account_status_id
         )
         state = account_status["CreateAccountStatus"]["State"].upper()
@@ -104,9 +109,9 @@ def main(account_id, cc_list, subject, communication_body):
     communication_body = template_to_string(communication_body, account_id)
 
     # Create the Enterprise support case.
-    client = boto3.client("support")
+    support_client = boto3.client("support", endpoint_url=EDGE_ENDPOINT)
     try:
-        response = client.create_case(
+        response = support_client.create_case(
             subject=subject,
             severityCode="low",
             categoryCode="other-account-issues",
@@ -127,7 +132,7 @@ def main(account_id, cc_list, subject, communication_body):
     # Use the case ID to obtain further details from the case and in
     # particular, the display ID.
     try:
-        case = client.describe_cases(caseIdList=[case_id])
+        case = support_client.describe_cases(caseIdList=[case_id])
     except botocore.exceptions.ClientError as describe_case_err:
         raise SupportCaseError(describe_case_err) from describe_case_err
 

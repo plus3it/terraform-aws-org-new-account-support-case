@@ -24,6 +24,7 @@ python/test:
 .PHONY: terraform/pytest
 terraform/pytest: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Starting test of Terraform lambda installation"
+	@ echo "[$@] 'localstack/up' must have be run beforehand"
 	@ echo "[$@] Terraform 'apply' command is slow ... be patient !!!"
 	pytest tests
 	@ echo "[$@]: Completed successfully!"
@@ -38,11 +39,13 @@ localstack/pytest: | guard/program/terraform guard/program/pytest
 
 localstack/up: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Starting LocalStack"
+	docker network create localstack-pytest
 	docker-compose -f tests/docker-compose-localstack.yml up --detach
 
 localstack/down: | guard/program/terraform guard/program/pytest
-	@ echo "[$@] Stopping and removing LocalStack container"
+	@ echo "[$@] Stopping the LocalStack container"
 	docker-compose -f tests/docker-compose-localstack.yml down
+	docker network rm localstack-pytest
 
 localstack/clean: | localstack/down
 	@ echo "[$@] Stopping and removing LocalStack container and images"
@@ -50,3 +53,4 @@ localstack/clean: | localstack/down
 		awk '{print $$1 ":" $$2}' | xargs -r docker rmi
 	set +o pipefail; docker images | grep new-account-support-case | \
 		awk '{print $$1 ":" $$2}' | xargs -r docker rmi
+	docker network rm localstack-pytest

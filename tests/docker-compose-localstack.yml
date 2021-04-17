@@ -1,4 +1,12 @@
-version: "2.1"
+version: "3.3"
+
+networks:
+  default:
+    external:
+      name: localstack-pytest
+
+volumes:
+  localstack:
 
 services:
   localstack:
@@ -6,8 +14,12 @@ services:
     image: localstack/localstack
     ports:
       - "4566:4566"
+      - "4615:4615"
       - "4571:4571"
     environment:
-      - SERVICES=cloudwatch,events,lambda,iam,sts
+      - SERVICES=cloudwatch,events,lambda,iam,sts,organizations,support
+      - MAIN_CONTAINER_NAME=localstack
+      - LAMBDA_DOCKER_NETWORK=localstack-pytest
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
+      - "$PWD/tests/initaws.d:/docker-entrypoint-initaws.d"
