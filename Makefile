@@ -45,7 +45,8 @@ localstack/up: | guard/program/terraform guard/program/pytest
 localstack/down: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Stopping the LocalStack container"
 	docker-compose -f tests/docker-compose-localstack.yml down
-	docker network rm localstack-pytest
+	set +o pipefail; docker network ls -f name=localstack-pytest -q | \
+		xargs -r docker network rm
 
 localstack/clean: | localstack/down
 	@ echo "[$@] Stopping and removing LocalStack container and images"
@@ -53,4 +54,3 @@ localstack/clean: | localstack/down
 		awk '{print $$1 ":" $$2}' | xargs -r docker rmi
 	set +o pipefail; docker images | grep new-account-support-case | \
 		awk '{print $$1 ":" $$2}' | xargs -r docker rmi
-	docker network rm localstack-pytest
