@@ -24,7 +24,7 @@ python/test:
 .PHONY: terraform/pytest
 terraform/pytest: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Starting test of Terraform lambda installation"
-	@ echo "[$@] 'localstack/up' must have be run beforehand"
+	@ echo "[$@] LocalStack must be running; 'make localstack/up' will start LocalStack"
 	@ echo "[$@] Terraform 'apply' command is slow ... be patient !!!"
 	pytest tests
 	@ echo "[$@]: Completed successfully!"
@@ -43,7 +43,7 @@ localstack/up: | guard/program/terraform guard/program/pytest
 	docker-compose -f tests/docker-compose-localstack.yml up --detach
 
 localstack/down: | guard/program/terraform guard/program/pytest
-	@ echo "[$@] Stopping the LocalStack container"
+	@ echo "[$@] Stopping LocalStack container"
 	docker-compose -f tests/docker-compose-localstack.yml down
 	set +o pipefail; docker network ls -f name=localstack-pytest -q | \
 		xargs -r docker network rm
