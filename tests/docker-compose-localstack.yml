@@ -13,7 +13,7 @@ services:
       - "4615:4615"
       - "4571:4571"
     environment:
-      - SERVICES=cloudwatch,events,lambda,iam,sts,organizations,support
+      - SERVICES=cloudwatch,events,lambda,iam,sts,support
       - MAIN_CONTAINER_NAME=localstack
       - LAMBDA_DOCKER_NETWORK=localstack-pytest
     volumes:
