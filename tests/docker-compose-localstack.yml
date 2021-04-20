@@ -2,11 +2,7 @@ version: "3.3"
 
 networks:
   default:
-    external:
       name: localstack-pytest
-
-volumes:
-  localstack:
 
 services:
   localstack:
