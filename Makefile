@@ -33,22 +33,19 @@ terraform/pytest: | guard/program/terraform guard/program/pytest
 .PHONY: localstack/pytest localstack/up localstack/down localstack/clean
 localstack/pytest: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Running Terraform tests against LocalStack"
-	DOCKER_RUN_FLAGS="--network host --rm" \
+	DOCKER_RUN_FLAGS="--network localstack --rm -e LOCALSTACK_HOST=localstack" \
 		TARDIGRADE_CI_DOCKERFILE=Dockerfile_test \
 		IMAGE_NAME=new-account-support-case-integration-test:latest \
 		$(MAKE) docker/run target=terraform/pytest
 	@ echo "[$@]: Completed successfully!"
 
 localstack/up: | guard/program/terraform guard/program/pytest
-	@ echo "[$@] Starting LocalStack"
-	docker network create localstack-pytest
+	@ echo "[$@] Starting LocalStack container"
 	docker-compose -f tests/docker-compose-localstack.yml up --detach
 
 localstack/down: | guard/program/terraform guard/program/pytest
 	@ echo "[$@] Stopping LocalStack container"
 	docker-compose -f tests/docker-compose-localstack.yml down
-	set +o pipefail; docker network ls -f name=localstack-pytest -q | \
-		xargs -r docker network rm
 
 localstack/clean: | localstack/down
 	@ echo "[$@] Stopping and removing LocalStack container and images"

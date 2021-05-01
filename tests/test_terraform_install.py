@@ -24,7 +24,8 @@ AWS_DEFAULT_REGION = os.getenv("AWS_REGION", default="us-east-1")
 
 # The AWS organizations service is not provided with the free version of
 # LocalStack, but moto does support it.
-ORG_ENDPOINT = "http://localhost:4615"
+LOCALSTACK_HOST = os.getenv("LOCALSTACK_HOST", default="localhost")
+ORG_ENDPOINT = f"http://{LOCALSTACK_HOST}:4615"
 
 MOCK_ORG_NAME = "test_account"
 MOCK_ORG_EMAIL = f"{MOCK_ORG_NAME}@mock.org"
@@ -49,7 +50,7 @@ def config_path():
 @pytest.fixture(scope="module")
 def localstack_session():
     """Return a LocalStack client session."""
-    return localstack_client.session.Session()
+    return localstack_client.session.Session(localstack_host=LOCALSTACK_HOST)
 
 
 @pytest.fixture(scope="function")
@@ -131,6 +132,7 @@ def tf_output(config_path):
         "cc_list": "foo.com,bar.com",
         "subject": "Add a new account for Acme",
         "communication_body": "Please add this account to Enterprise support",
+        "localstack_host": LOCALSTACK_HOST,
     }
 
     try:

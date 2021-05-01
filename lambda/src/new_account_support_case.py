@@ -26,8 +26,8 @@ LOG = Logger(
 )
 
 LOCALSTACK_IP = os.getenv("LOCALSTACK_HOSTNAME")
-ORG_ENDPOINT = "http://localstack:4615" if LOCALSTACK_IP else None
-EDGE_ENDPOINT = "http://localstack:4566" if LOCALSTACK_IP else None
+ORG_ENDPOINT = f"http://{LOCALSTACK_IP}:4615"
+EDGE_ENDPOINT = f"http://{LOCALSTACK_IP}:4566"
 
 
 ### Classes and functions specific to the Lambda event handler itself.
@@ -145,21 +145,8 @@ def main(account_id, cc_list, subject, communication_body):
     return 0
 
 
-@LOG.inject_lambda_context(log_event=True)
-def lambda_handler(event, context):  # pylint: disable=unused-argument
-    """Entry point if script called by AWS Lamdba."""
-    cc_list = os.environ.get("CC_LIST")
-    communication_body = os.environ.get("COMMUNICATION_BODY")
-    subject = os.environ.get("SUBJECT")
-    LOG.info(
-        {
-            "CC_LIST": cc_list,
-            "COMMUNICATION_BODY": communication_body,
-            "SUBJECT": subject,
-        }
-    )
-
-    # Check for missing requirement environment variables.
+def check_for_null_envvars(cc_list, communication_body, subject):
+    """Check for missing requirement environment variables."""
     if not cc_list:
         msg = (
             "Environment variable 'CC_LIST' must provide at least one "
@@ -183,6 +170,24 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
         )
         LOG.error(msg)
         raise SupportCaseInvalidArgumentsError(msg)
+
+
+@LOG.inject_lambda_context(log_event=True)
+def lambda_handler(event, context):  # pylint: disable=unused-argument
+    """Entry point if script called by AWS Lamdba."""
+    cc_list = os.environ.get("CC_LIST")
+    communication_body = os.environ.get("COMMUNICATION_BODY")
+    subject = os.environ.get("SUBJECT")
+    LOG.info(
+        {
+            "CC_LIST": cc_list,
+            "COMMUNICATION_BODY": communication_body,
+            "SUBJECT": subject,
+        }
+    )
+
+    # Check for missing requirement environment variables.
+    check_for_null_envvars(cc_list, communication_body, subject)
 
     try:
         account_id = get_account_id(event)
