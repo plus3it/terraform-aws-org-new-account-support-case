@@ -26,8 +26,8 @@ LOG = Logger(
 )
 
 LOCALSTACK_IP = os.getenv("LOCALSTACK_HOSTNAME")
-ORG_ENDPOINT = f"http://{LOCALSTACK_IP}:4615"
-EDGE_ENDPOINT = f"http://{LOCALSTACK_IP}:4566"
+ORG_ENDPOINT = "http://localstack:4615" if LOCALSTACK_IP else None
+EDGE_ENDPOINT = "http://localstack:4566" if LOCALSTACK_IP else None
 
 
 ### Classes and functions specific to the Lambda event handler itself.
