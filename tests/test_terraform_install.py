@@ -15,10 +15,20 @@ import uuid
 import pytest
 import tftest
 
+import boto3
 import localstack_client.session
+from moto import mock_organizations
 
 
 AWS_DEFAULT_REGION = os.getenv("AWS_REGION", default="us-east-1")
+
+# The AWS organizations service is not provided with the free version of
+# LocalStack, but moto does support it.
+LOCALSTACK_HOST = os.getenv("LOCALSTACK_HOST", default="localhost")
+ORG_ENDPOINT = f"http://{LOCALSTACK_HOST}:4615"
+
+MOCK_ORG_NAME = "test_account"
+MOCK_ORG_EMAIL = f"{MOCK_ORG_NAME}@mock.org"
 
 
 @pytest.fixture(scope="module")
@@ -40,12 +50,45 @@ def config_path():
 @pytest.fixture(scope="module")
 def localstack_session():
     """Return a LocalStack client session."""
-    return localstack_client.session.Session()
+    return localstack_client.session.Session(localstack_host=LOCALSTACK_HOST)
 
 
-@pytest.fixture(scope="module")
-def mock_event():
+@pytest.fixture(scope="function")
+def aws_credentials(tmpdir, monkeypatch):
+    """Create mocked AWS credentials for moto."""
+    # Create a temporary AWS credentials file for calls to boto.Session().
+    aws_creds = [
+        "[testing]",
+        "aws_access_key_id = testing",
+        "aws_secret_access_key = testing",
+    ]
+    path = tmpdir.join("aws_test_creds")
+    path.write("\n".join(aws_creds))
+    monkeypatch.setenv("AWS_SHARED_CREDENTIALS_FILE", str(path))
+
+    # Ensure that any existing environment variables are overridden with
+    # 'mock' values.
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_PROFILE", "testing")  # Not standard, but in use locally.
+
+
+@pytest.fixture(scope="function")
+def org_client(aws_credentials):
+    """Yield a mock organization that will not affect a real AWS account."""
+    with mock_organizations():
+        yield boto3.client("organizations", endpoint_url=ORG_ENDPOINT)
+
+
+@pytest.fixture(scope="function")
+def mock_event(org_client):
     """Create an event used as an argument to the Lambda handler."""
+    org_client.create_organization(FeatureSet="ALL")
+    account_id = org_client.create_account(
+        AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL
+    )["CreateAccountStatus"]["Id"]
     return {
         "version": "0",
         "id": str(uuid.uuid4()),
@@ -53,14 +96,14 @@ def mock_event():
         "source": "aws.organizations",
         "account": "222222222222",
         "time": datetime.now().isoformat(),
-        "region": "us-east-1",
+        "region": AWS_DEFAULT_REGION,
         "resources": [],
         "detail": {
             "eventName": "CreateAccount",
             "eventSource": "organizations.amazonaws.com",
             "responseElements": {
                 "createAccountStatus": {
-                    "id": "car-123456789",
+                    "id": account_id,
                 }
             },
         },
@@ -89,6 +132,7 @@ def tf_output(config_path):
         "cc_list": "foo.com,bar.com",
         "subject": "Add a new account for Acme",
         "communication_body": "Please add this account to Enterprise support",
+        "localstack_host": LOCALSTACK_HOST,
     }
 
     try:
@@ -140,11 +184,6 @@ def test_lambda_dry_run(tf_output, localstack_session):
 
 def test_lambda_invocation(tf_output, localstack_session, mock_event):
     """Verify a support case was created."""
-    # The event does not have a valid ID, so the lambda invocation
-    # will fail.  However, when it fails, an InvocationException (or
-    # InvalidInputException when using AWS) should be raised.  This proves
-    # the lambda and the AWS powertools library are installed.  (The AWS
-    # powertools library is invoked to log exceptions.)
     lambda_client = localstack_session.client("lambda", region_name=AWS_DEFAULT_REGION)
     lambda_module = tf_output["lambda"]
     response = lambda_client.invoke(
@@ -154,22 +193,23 @@ def test_lambda_invocation(tf_output, localstack_session, mock_event):
     )
     assert response["StatusCode"] == 200
 
+    # No response is a good response.  The Lambda is not expected to
+    # return anything.
     response_payload = json.loads(response["Payload"].read().decode())
-    assert response_payload
-    assert "errorType" in response_payload
-    # The errorType will differ depending on whether the LocalStack is used
-    # or not.  For LocalStack, the errorType is InvocationException.  For
-    # AWS, the errorType is InvalidInputException.
-    assert response_payload["errorType"] == "InvocationException"
+    assert not response_payload
 
-    # The error message should indicate that DescribeCreateAccountStatus()
-    # failed -- the exact reason why this AWS function fails will differ
-    # depends upon whether LocalStack is used or not. For compatibility,
-    # the error message text is shortened to the portion that is compatible
-    # with the AWS stack or LocalStack.
-    assert "errorMessage" in response_payload
-    error_msg = (
-        "An error occurred (UnrecognizedClientException) when calling the "
-        "DescribeCreateAccountStatus operation:"
-    )
-    assert error_msg in response_payload["errorMessage"]
+    support_client = localstack_session.client("support")
+    all_cases = support_client.describe_cases()
+    assert all_cases
+
+    for case in all_cases["cases"]:
+        if case["subject"] != "Add a new account for Acme":
+            continue
+        if case["ccEmailAddresses"][0] != "foo.com,bar.com":
+            continue
+        if case["recentCommunications"]["communications"][0]["body"] == (
+            "Please add this account to Enterprise support"
+        ):
+            break
+    else:
+        assert False, "Failed to find the support case the Lambda created"

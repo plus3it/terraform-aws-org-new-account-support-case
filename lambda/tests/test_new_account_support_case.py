@@ -7,8 +7,8 @@ from datetime import datetime
 import os
 import uuid
 
-import pytest
 import boto3
+import pytest
 from moto import mock_iam
 from moto import mock_support
 from moto import mock_organizations
@@ -102,7 +102,7 @@ def mock_event(org_client):
         "source": "aws.organizations",
         "account": "222222222222",
         "time": datetime.now().isoformat(),
-        "region": "us-east-1",
+        "region": AWS_REGION,
         "resources": [],
         "detail": {
             "eventName": "CreateAccount",
