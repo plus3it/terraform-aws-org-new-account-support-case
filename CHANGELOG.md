@@ -4,9 +4,19 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+### 0.2.1
+
+**Commit Delta**: [Change from 0.2.0 release](https://github.com/plus3it/terraform-aws-org-new-account-support-case/compare/0.2.0...0.2.1)
+
+**Released**: 2021.05.28
+
+**Summary**:
+
+*   Corrects lambda policy to allow support:DescribeCases.
+
 ### 0.2.0
 
-**Commit Delta**: [Change from 0.2.0 release](https://github.com/plus3it/terraform-aws-org-new-account-support-case/compare/0.1.1...0.2.0)
+**Commit Delta**: [Change from 0.1.1 release](https://github.com/plus3it/terraform-aws-org-new-account-support-case/compare/0.1.1...0.2.0)
 
 **Released**: 2021.04.29
 
