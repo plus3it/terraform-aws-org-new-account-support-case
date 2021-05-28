@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "lambda" {
     actions = [
       "organizations:DescribeCreateAccountStatus",
       "support:CreateCase",
-      "support:DescribeCase"
+      "support:DescribeCases"
     ]
 
     resources = [
