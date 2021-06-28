@@ -1,4 +1,4 @@
 tftest==1.6.0
 pytest==6.2.3
-moto==2.0.5
+moto==2.0.10
 localstack-client==1.21
