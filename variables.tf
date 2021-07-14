@@ -15,3 +15,9 @@ variable "subject" {
   description = "Text for 'Subject' field of the communication sent to support.  The variable 'account_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces."
   type        = string
 }
+
+variable "tags" {
+  default     = {}
+  description = "Tags that are passed to resources"
+  type        = map(string)
+}

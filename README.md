@@ -50,6 +50,7 @@ make localstack/clean
 | <a name="input_communication_body"></a> [communication\_body](#input\_communication\_body) | Text for body of the communication sent to support.  The variable 'account\_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces. | `string` | n/a | yes |
 | <a name="input_subject"></a> [subject](#input\_subject) | Text for 'Subject' field of the communication sent to support.  The variable 'account\_id' can be used within the text if preceded by a dollar sign and optionally enclosed by curly braces. | `string` | n/a | yes |
 | <a name="input_log_level"></a> [log\_level](#input\_log\_level) | Log level of the lambda output, one of: debug, info, warning, error, critical | `string` | `"info"` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | Tags that are passed to resources | `map(string)` | `{}` | no |
 
 ## Outputs
 
