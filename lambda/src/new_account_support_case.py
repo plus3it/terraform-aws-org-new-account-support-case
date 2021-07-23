@@ -141,7 +141,7 @@ def main(account_id, cc_list, subject, communication_body):
     except KeyError as key_err:
         raise SupportCaseError(key_err) from key_err
 
-    LOG.info(f"Case {display_id} opened")
+    LOG.info("Case %s opened", display_id)
     return 0
 
 
