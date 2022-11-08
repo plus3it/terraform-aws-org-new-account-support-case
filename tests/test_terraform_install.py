@@ -18,6 +18,7 @@ import tftest
 import boto3
 import localstack_client.session
 from moto import mock_organizations
+from moto.core import DEFAULT_ACCOUNT_ID as ACCOUNT_ID
 
 
 AWS_DEFAULT_REGION = os.getenv("AWS_REGION", default="us-east-1")
@@ -86,24 +87,29 @@ def org_client(aws_credentials):
 def mock_event(org_client):
     """Create an event used as an argument to the Lambda handler."""
     org_client.create_organization(FeatureSet="ALL")
-    account_id = org_client.create_account(
-        AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL
-    )["CreateAccountStatus"]["Id"]
+    car_id = org_client.create_account(AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL)[
+        "CreateAccountStatus"
+    ]["Id"]
+    create_account_status = org_client.describe_create_account_status(
+        CreateAccountRequestId=car_id
+    )
     return {
         "version": "0",
         "id": str(uuid.uuid4()),
-        "detail-type": "AWS API Call via CloudTrail",
+        "detail-type": "AWS Service Event via CloudTrail",
         "source": "aws.organizations",
-        "account": "222222222222",
+        "account": ACCOUNT_ID,
         "time": datetime.now().isoformat(),
         "region": AWS_DEFAULT_REGION,
         "resources": [],
         "detail": {
-            "eventName": "CreateAccount",
+            "eventName": "CreateAccountResult",
             "eventSource": "organizations.amazonaws.com",
-            "responseElements": {
+            "serviceEventDetails": {
                 "createAccountStatus": {
-                    "id": account_id,
+                    "accountId": create_account_status["CreateAccountStatus"][
+                        "AccountId"
+                    ]
                 }
             },
         },
@@ -126,7 +132,11 @@ def tf_output(config_path):
 
     # Use LocalStack to simulate the AWS stack.  "localstack.tf" contains
     # the endpoints and services information needed by LocalStack.
-    tf_test.setup(extra_files=[str(Path(Path.cwd() / "tests" / "localstack.tf"))])
+    tf_test.setup(
+        extra_files=[str(Path(Path.cwd() / "tests" / "localstack.tf"))],
+        upgrade=True,
+        cleanup_on_exit=False,
+    )
 
     tf_vars = {
         "cc_list": "foo.com,bar.com",
@@ -135,15 +145,9 @@ def tf_output(config_path):
         "localstack_host": LOCALSTACK_HOST,
     }
 
-    try:
-        tf_test.apply(tf_vars=tf_vars)
-        yield tf_test.output(json_format=True)
-    except tftest.TerraformTestError as exc:
-        pytest.exit(
-            msg=f"Catastropic error running Terraform 'apply':  {exc}", returncode=1
-        )
-    finally:
-        tf_test.destroy(tf_vars=tf_vars)
+    tf_test.apply(tf_vars=tf_vars)
+    yield tf_test.output(json_format=True)
+    tf_test.destroy(tf_vars=tf_vars)
 
 
 def test_outputs(tf_output):
@@ -156,19 +160,22 @@ def test_outputs(tf_output):
         "lambda",
     ]
 
-    prefix = "new_account_support_case"
+    prefix = "new-account-support-case"
 
     lambda_module = tf_output["lambda"]
-    assert lambda_module["function_name"].startswith(prefix)
+    assert lambda_module["lambda_function_name"].startswith(prefix)
 
     event_rule_output = tf_output["aws_cloudwatch_event_rule"]
-    assert event_rule_output["name"].startswith(prefix)
+    for _, event_rule in event_rule_output.items():
+        assert event_rule["name"].startswith(prefix)
 
     event_target_output = tf_output["aws_cloudwatch_event_target"]
-    assert event_target_output["rule"].startswith(prefix)
+    for _, event_target in event_target_output.items():
+        assert event_target["rule"].startswith(prefix)
 
     permission_events_output = tf_output["aws_lambda_permission_events"]
-    assert permission_events_output["function_name"].startswith(prefix)
+    for _, lambda_permission in permission_events_output.items():
+        assert lambda_permission["function_name"].startswith(prefix)
 
 
 def test_lambda_dry_run(tf_output, localstack_session):
@@ -176,7 +183,7 @@ def test_lambda_dry_run(tf_output, localstack_session):
     lambda_client = localstack_session.client("lambda", region_name=AWS_DEFAULT_REGION)
     lambda_module = tf_output["lambda"]
     response = lambda_client.invoke(
-        FunctionName=lambda_module["function_name"],
+        FunctionName=lambda_module["lambda_function_name"],
         InvocationType="DryRun",
     )
     assert response["StatusCode"] == 204
@@ -187,7 +194,7 @@ def test_lambda_invocation(tf_output, localstack_session, mock_event):
     lambda_client = localstack_session.client("lambda", region_name=AWS_DEFAULT_REGION)
     lambda_module = tf_output["lambda"]
     response = lambda_client.invoke(
-        FunctionName=lambda_module["function_name"],
+        FunctionName=lambda_module["lambda_function_name"],
         InvocationType="RequestResponse",
         Payload=json.dumps(mock_event),
     )

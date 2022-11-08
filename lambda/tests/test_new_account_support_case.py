@@ -92,24 +92,29 @@ def org_client(aws_credentials):
 def mock_event(org_client):
     """Create an event used as an argument to the Lambda handler."""
     org_client.create_organization(FeatureSet="ALL")
-    create_account_id = org_client.create_account(
-        AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL
-    )["CreateAccountStatus"]["Id"]
+    car_id = org_client.create_account(AccountName=MOCK_ORG_NAME, Email=MOCK_ORG_EMAIL)[
+        "CreateAccountStatus"
+    ]["Id"]
+    create_account_status = org_client.describe_create_account_status(
+        CreateAccountRequestId=car_id
+    )
     return {
         "version": "0",
         "id": str(uuid.uuid4()),
-        "detail-type": "AWS API Call via CloudTrail",
+        "detail-type": "AWS Service Event via CloudTrail",
         "source": "aws.organizations",
-        "account": "222222222222",
+        "account": ACCOUNT_ID,
         "time": datetime.now().isoformat(),
         "region": AWS_REGION,
         "resources": [],
         "detail": {
-            "eventName": "CreateAccount",
+            "eventName": "CreateAccountResult",
             "eventSource": "organizations.amazonaws.com",
-            "responseElements": {
+            "serviceEventDetails": {
                 "createAccountStatus": {
-                    "id": create_account_id,
+                    "accountId": create_account_status["CreateAccountStatus"][
+                        "AccountId"
+                    ]
                 }
             },
         },
@@ -119,14 +124,9 @@ def mock_event(org_client):
 @pytest.fixture(scope="function")
 def account_id(org_client, mock_event):
     """Return the account_id created for the new account in the org."""
-    org = boto3.client("organizations")
-    account_status_id = mock_event["detail"]["responseElements"]["createAccountStatus"][
-        "id"
+    return mock_event["detail"]["serviceEventDetails"]["createAccountStatus"][
+        "accountId"
     ]
-    account_status = org.describe_create_account_status(
-        CreateAccountRequestId=account_status_id
-    )
-    return account_status["CreateAccountStatus"]["AccountId"]
 
 
 def test_main_func_valid_arguments(support_client):
@@ -135,13 +135,12 @@ def test_main_func_valid_arguments(support_client):
     subject = str(uuid.uuid4())
     communication_body = str(uuid.uuid4())
 
-    return_code = lambda_func.main(
+    lambda_func.main(
         account_id=ACCOUNT_ID,
         cc_list=cc_list,
         subject=subject,
         communication_body=communication_body,
     )
-    assert return_code == 0
 
     cases = support_client.describe_cases()
     for case in cases["cases"]:
@@ -268,18 +267,18 @@ def test_lambda_handler_envvars_with_bad_vars(
     monkeypatch.setenv("CC_LIST", "bar.com")
     monkeypatch.setenv("SUBJECT", test_subject)
     monkeypatch.setenv("COMMUNICATION_BODY", "Email body")
-    with pytest.raises(lambda_func.SupportCaseError) as exc:
+    with pytest.raises(KeyError) as exc:
         lambda_func.lambda_handler(mock_event, lambda_context)
-    assert f"Unexpected variable 'unknown_var' found in '{test_subject}'" in str(
-        exc.value
-    )
+        assert f"Unexpected variable 'unknown_var' found in '{test_subject}'" in str(
+            exc.value
+        )
 
     test_body = "Email body with $account_id and $unexpected_var"
     monkeypatch.setenv("CC_LIST", "bar.com")
     monkeypatch.setenv("SUBJECT", "Test subject")
     monkeypatch.setenv("COMMUNICATION_BODY", test_body)
-    with pytest.raises(lambda_func.SupportCaseError) as exc:
+    with pytest.raises(KeyError) as exc:
         lambda_func.lambda_handler(mock_event, lambda_context)
-    assert f"Unexpected variable 'unexpected_var' found in '{test_body}'" in str(
-        exc.value
-    )
+        assert f"Unexpected variable 'unexpected_var' found in '{test_body}'" in str(
+            exc.value
+        )
