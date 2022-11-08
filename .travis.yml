@@ -46,8 +46,7 @@ jobs:
           (set -x; git tag -a $RELEASE_VERSION -m $RELEASE_VERSION)
       deploy:
         provider: releases
-        api_key:
-          secure: HuGP8E/Mh4IfQg08ot++SfZPb5ydFtkRJ0fOQAL92hZJgqxODT4eqFQhGFd5OjNfRgBDuEIvU4E0NrE7a87yDXcz/56h3rdzXjtNIFTzFSg015Ult4i8ponU6PNqY8fQ9Zc908GQRviA9X8HHYK/HgoFir59a0CWg4LRf/AbO5XPlWtJlgTpPmt1nuoabwOhermx0dkrAlkVzLKFNDjAaAHQmoQAqVNQM1PZmkl7illAHcW8M47nKQApp4uNjCFz5wX8gcfLTG9hnBU93kZM70mLJjBJxcwnqCUScX46JPBQqXYSlii6OSXg3xyMOa0ThYFEBrb9KReKUmlcowEE0g/cQaazIOQZTxmnPqSX7X7vhZykfloTO1UIzmI3chvHKxN0rzaCLXvypGcgcAYarCsBEqHuaPAToerL6rFiRRB3W9xgw4r51NQTXDAmYKKKvnkMfP3OSnwRAqJu4XtWJFdqQ6Y0oXxE92MUAqJWP6s9Tbq4L2anU91fJpJwvqlA90MmGsciwXGQbRL1JsIGG3OP4uw7/7QLkQA6Hp/nGaQOw3RxaF/u0qKkVGHE0BewDq4JrRXNQvmm01eEiDpoYB2zyWlQbCUPfIy8tCFy+DLeq23wNObAeTSSJjGnJ/eG0Sz+FpL4+dLzI1y35HSEuEuFHgPXuGLdocTbYh1wyZ4=
+        api_key: $GH_RELEASES_TOKEN
         name: $RELEASE_VERSION
         body: $RELEASE_BODY
         tag_name: $RELEASE_VERSION
