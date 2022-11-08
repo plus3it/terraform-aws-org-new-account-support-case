@@ -1,5 +1,5 @@
 locals {
-  name = "new-account-support-case_${random_string.id.result}"
+  name = "new-account-support-case-${random_string.id.result}"
 }
 
 data "aws_partition" "current" {}
@@ -7,7 +7,6 @@ data "aws_partition" "current" {}
 data "aws_iam_policy_document" "lambda" {
   statement {
     actions = [
-      "organizations:DescribeCreateAccountStatus",
       "support:CreateCase",
       "support:DescribeCases"
     ]
@@ -56,38 +55,61 @@ module "lambda" {
 }
 
 resource "random_string" "id" {
-  length  = 13
+  length  = 8
   special = false
 }
 
-resource "aws_cloudwatch_event_rule" "this" {
-  name          = local.name
-  description   = "Managed by Terraform"
-  event_pattern = <<-PATTERN
-    {
-      "source": ["aws.organizations"],
-      "detail-type": ["AWS API Call via CloudTrail"],
-      "detail": {
-        "eventSource": ["organizations.amazonaws.com"],
-        "eventName": [
-            "InviteAccountToOrganization",
-            "CreateAccount",
-            "CreateGovCloudAccount"
-        ]
+locals {
+  event_types = {
+    CreateAccountResult = jsonencode(
+      {
+        "source" : ["aws.organizations"],
+        "detail-type" : ["AWS Service Event via CloudTrail"]
+        "detail" : {
+          "eventSource" : ["organizations.amazonaws.com"],
+          "eventName" : ["CreateAccountResult"]
+          "serviceEventDetails" : {
+            "createAccountStatus" : {
+              "state" : ["SUCCEEDED"]
+            }
+          }
+        }
       }
-    }
-    PATTERN
+    )
+    InviteAccountToOrganization = jsonencode(
+      {
+        "source" : ["aws.organizations"],
+        "detail-type" : ["AWS API Call via CloudTrail"]
+        "detail" : {
+          "eventSource" : ["organizations.amazonaws.com"],
+          "eventName" : ["InviteAccountToOrganization"]
+        }
+      }
+    )
+  }
+}
+
+resource "aws_cloudwatch_event_rule" "this" {
+  for_each = var.event_types
+
+  name          = "${local.name}-${each.value}"
+  description   = "Managed by Terraform"
+  event_pattern = local.event_types[each.value]
   tags          = var.tags
 }
 
 resource "aws_cloudwatch_event_target" "this" {
-  rule = aws_cloudwatch_event_rule.this.name
+  for_each = aws_cloudwatch_event_rule.this
+
+  rule = each.value.name
   arn  = module.lambda.lambda_function_arn
 }
 
 resource "aws_lambda_permission" "events" {
+  for_each = aws_cloudwatch_event_rule.this
+
   action        = "lambda:InvokeFunction"
   function_name = module.lambda.lambda_function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.this.arn
+  source_arn    = each.value.arn
 }
