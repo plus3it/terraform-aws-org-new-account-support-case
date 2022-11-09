@@ -16,9 +16,10 @@
 tardigrade-ci/
 .tardigrade-ci
 
-# terratest packaging
-tests/go.*
-
 # python cache
 __pycache__
 .python-version
+.pytest_cache
+
+# lambda builds
+builds/

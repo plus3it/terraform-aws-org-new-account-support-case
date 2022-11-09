@@ -4,11 +4,9 @@ from argparse import ArgumentParser, RawDescriptionHelpFormatter
 import os
 from string import Template
 import sys
-import time
 
 from aws_lambda_powertools import Logger
 import boto3
-import botocore
 
 
 LOG_LEVEL = os.environ.get("LOG_LEVEL", "info")
@@ -33,32 +31,19 @@ EDGE_ENDPOINT = "http://localstack:4566" if LOCALSTACK_IP else None
 ### Classes and functions specific to the Lambda event handler itself.
 
 
-class AccountCreationFailedError(Exception):
-    """Account creation failed."""
+def exception_hook(exc_type, exc_value, exc_traceback):
+    """Log all exceptions with hook for sys.excepthook."""
+    LOG.exception(
+        "%s: %s",
+        exc_type.__name__,
+        exc_value,
+        exc_info=(exc_type, exc_value, exc_traceback),
+    )
 
 
 def get_new_account_id(event):
     """Return account id for new account events."""
-    create_account_status_id = (
-        event["detail"]
-        .get("responseElements", {})
-        .get("createAccountStatus", {})["id"]  # fmt: no
-    )
-    LOG.info({"create_account_status_id": create_account_status_id})
-
-    org_client = boto3.client("organizations", endpoint_url=ORG_ENDPOINT)
-    while True:
-        account_status = org_client.describe_create_account_status(
-            CreateAccountRequestId=create_account_status_id
-        )
-        state = account_status["CreateAccountStatus"]["State"].upper()
-        if state == "SUCCEEDED":
-            return account_status["CreateAccountStatus"]["AccountId"]
-        if state == "FAILED":
-            LOG.error({"create_account_status_failure": account_status})
-            raise AccountCreationFailedError
-        LOG.info({"create_account_status_state": state})
-        time.sleep(5)
+    return event["detail"]["serviceEventDetails"]["createAccountStatus"]["accountId"]
 
 
 def get_invite_account_id(event):
@@ -70,15 +55,10 @@ def get_account_id(event):
     """Return account id for supported events."""
     event_name = event["detail"]["eventName"]
     get_account_id_strategy = {
-        "CreateAccount": get_new_account_id,
-        "CreateGovCloudAccount": get_new_account_id,
+        "CreateAccountResult": get_new_account_id,
         "InviteAccountToOrganization": get_invite_account_id,
     }
-    try:
-        account_id = get_account_id_strategy[event_name](event)
-    except (botocore.exceptions.ClientError, AccountCreationFailedError) as err:
-        raise AccountCreationFailedError(err) from err
-    return account_id
+    return get_account_id_strategy[event_name](event)
 
 
 ### Classes and functions specific to creating the support case.
@@ -94,13 +74,7 @@ class SupportCaseError(Exception):
 
 def template_to_string(template, account_id):
     """Replace account_id variable in string with actual value."""
-    try:
-        return Template(template).substitute(account_id=account_id)
-    except KeyError as err:
-        raise SupportCaseError(
-            f"Unexpected variable {err} found in '{template}'"
-        ) from err
-    return template
+    return Template(template).substitute(account_id=account_id)
 
 
 def main(account_id, cc_list, subject, communication_body):
@@ -110,19 +84,16 @@ def main(account_id, cc_list, subject, communication_body):
 
     # Create the Enterprise support case.
     support_client = boto3.client("support", endpoint_url=EDGE_ENDPOINT)
-    try:
-        response = support_client.create_case(
-            subject=subject,
-            severityCode="low",
-            categoryCode="other-account-issues",
-            serviceCode="customer-account",
-            communicationBody=communication_body,
-            ccEmailAddresses=[cc_list],
-            language="en",
-            issueType="customer-service",
-        )
-    except botocore.exceptions.ClientError as create_case_err:
-        raise SupportCaseError(create_case_err) from create_case_err
+    response = support_client.create_case(
+        subject=subject,
+        severityCode="low",
+        categoryCode="other-account-issues",
+        serviceCode="customer-account",
+        communicationBody=communication_body,
+        ccEmailAddresses=[cc_list],
+        language="en",
+        issueType="customer-service",
+    )
 
     # Extract case ID from response.
     case_id = response["caseId"]
@@ -131,18 +102,11 @@ def main(account_id, cc_list, subject, communication_body):
 
     # Use the case ID to obtain further details from the case and in
     # particular, the display ID.
-    try:
-        case = support_client.describe_cases(caseIdList=[case_id])
-    except botocore.exceptions.ClientError as describe_case_err:
-        raise SupportCaseError(describe_case_err) from describe_case_err
+    case = support_client.describe_cases(caseIdList=[case_id])
 
-    try:
-        display_id = case["cases"][0]["displayId"]
-    except KeyError as key_err:
-        raise SupportCaseError(key_err) from key_err
+    display_id = case["cases"][0]["displayId"]
 
-    LOG.info("Case %s opened", display_id)
-    return 0
+    LOG.info({"comment": "Case %s opened"}, display_id)
 
 
 def check_for_null_envvars(cc_list, communication_body, subject):
@@ -189,24 +153,13 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
     # Check for missing requirement environment variables.
     check_for_null_envvars(cc_list, communication_body, subject)
 
-    try:
-        account_id = get_account_id(event)
-    except AccountCreationFailedError as account_err:
-        LOG.error({"failure": account_err})
-        raise
-    except Exception:
-        LOG.exception("Unexpected, unknown exception in account ID logic")
-        raise
+    account_id = get_account_id(event)
 
-    try:
-        main(account_id, cc_list, subject, communication_body)
-    except (SupportCaseInvalidArgumentsError, SupportCaseError) as err:
-        LOG.error({"failure": err})
-        raise
-    except Exception:
-        LOG.exception("Unexpected, unknown exception creating support case")
-        raise
+    main(account_id, cc_list, subject, communication_body)
 
+
+# Configure exception handler
+sys.excepthook = exception_hook
 
 if __name__ == "__main__":
 
