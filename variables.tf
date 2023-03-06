@@ -23,7 +23,7 @@ variable "event_types" {
 }
 
 variable "lambda" {
-  description = "Object of optional attributes passed on to the lambda module"
+  description = "Map of any additional arguments for the upstream lambda module. See <https://github.com/terraform-aws-modules/terraform-aws-lambda>"
   type = object({
     artifacts_dir            = optional(string, "builds")
     build_in_docker          = optional(bool, false)
