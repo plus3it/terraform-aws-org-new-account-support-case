@@ -1,21 +1,21 @@
-version: "3.5"
+version: "3.8"
 
 networks:
   default:
-    name: localstack-pytest
+    name: terraform_pytest_default
 
 services:
   localstack:
     container_name: localstack
-    image: localstack/localstack
+    image: "localstack/localstack:${LOCALSTACK_VERSION:-latest}"
     ports:
       - "4566:4566"
       - "4615:4615"
       - "4571:4571"
     environment:
-      - SERVICES=cloudwatch,events,lambda,iam,sts,support
       - MAIN_CONTAINER_NAME=localstack
-      - LAMBDA_DOCKER_NETWORK=localstack-pytest
+      - LAMBDA_DOCKER_NETWORK=terraform_pytest_default
+      - MOTO_DOCKER_NETWORK_NAME=terraform_pytest_default
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock"
-      - "$PWD/tests/initaws.d:/docker-entrypoint-initaws.d"
+      - "${TERRAFORM_PYTEST_DIR}/ready.d:/etc/localstack/init/ready.d"
