@@ -25,7 +25,7 @@ AWS_DEFAULT_REGION = os.getenv("AWS_REGION", default="us-east-1")
 
 # The AWS organizations service is not provided with the free version of
 # LocalStack, but moto does support it.
-LOCALSTACK_HOST = os.getenv("LOCALSTACK_HOST", default="localhost")
+LOCALSTACK_HOST = os.getenv("LOCALSTACK_HOST", default="localstack")
 ORG_ENDPOINT = f"http://{LOCALSTACK_HOST}:4615"
 
 MOCK_ORG_NAME = "test_account"
