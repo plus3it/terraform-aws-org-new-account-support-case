@@ -3,6 +3,7 @@
 Neither LocalStack nor moto_server support the "support" service,
 so testing is very minimal.
 """
+
 from datetime import datetime
 import os
 import uuid
