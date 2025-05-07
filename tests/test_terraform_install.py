@@ -18,7 +18,7 @@ import tftest
 
 import boto3
 import localstack_client.session
-from moto import mock_organizations
+from moto import mock_aws
 from moto.core import DEFAULT_ACCOUNT_ID as ACCOUNT_ID
 
 
@@ -80,7 +80,7 @@ def aws_credentials(tmpdir, monkeypatch):
 @pytest.fixture(scope="function")
 def org_client(aws_credentials):
     """Yield a mock organization that will not affect a real AWS account."""
-    with mock_organizations():
+    with mock_aws(config={"iam": {"load_aws_managed_policies": True}}):
         yield boto3.client("organizations", endpoint_url=ORG_ENDPOINT)
 
 
