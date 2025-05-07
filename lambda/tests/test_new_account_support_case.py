@@ -230,7 +230,7 @@ def test_lambda_handler_envvars_with_account_id(
     monkeypatch,
     mock_event,
     account_id,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Invoke the lambda handler with account_id variable in envvars."""
     wild_card = str(uuid.uuid4())
 
@@ -260,7 +260,7 @@ def test_lambda_handler_envvars_with_bad_vars(
     monkeypatch,
     mock_event,
     account_id,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Invoke the lambda handler with account_id variable in envvars."""
     test_subject = "Subject with $unknown_var"
     monkeypatch.setenv("CC_LIST", "bar.com")
