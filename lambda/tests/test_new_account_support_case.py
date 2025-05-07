@@ -10,9 +10,7 @@ import uuid
 
 import boto3
 import pytest
-from moto import mock_iam
-from moto import mock_support
-from moto import mock_organizations
+from moto import mock_aws
 from moto.core import DEFAULT_ACCOUNT_ID as ACCOUNT_ID
 
 import new_account_support_case as lambda_func
@@ -47,7 +45,7 @@ def aws_credentials(tmpdir, monkeypatch):
 
     In addition to using the aws_credentials fixture, the test functions
     must also use a mocked client.  For this test file, that would be the
-    test fixture "iam_client", which invokes "mock_iam()".
+    test fixture "iam_client", which invokes "mock_aws()".
     """
     # Create a temporary AWS credentials file for calls to boto.Session().
     aws_creds = [
@@ -71,21 +69,21 @@ def aws_credentials(tmpdir, monkeypatch):
 @pytest.fixture(scope="function")
 def iam_client(aws_credentials):
     """Yield a mock IAM client that will not affect a real AWS account."""
-    with mock_iam():
+    with mock_aws(config={"iam": {"load_aws_managed_policies": True}}):
         yield boto3.client("iam", region_name=AWS_REGION)
 
 
 @pytest.fixture(scope="function")
 def support_client(aws_credentials):
     """Yield a mock support client that will not affect a real AWS account."""
-    with mock_support():
+    with mock_aws(config={"iam": {"load_aws_managed_policies": True}}):
         yield boto3.client("support", region_name=AWS_REGION)
 
 
 @pytest.fixture(scope="function")
 def org_client(aws_credentials):
     """Yield a mock organization that will not affect a real AWS account."""
-    with mock_organizations():
+    with mock_aws(config={"iam": {"load_aws_managed_policies": True}}):
         yield boto3.client("organizations", region_name=AWS_REGION)
 
 
@@ -232,7 +230,7 @@ def test_lambda_handler_envvars_with_account_id(
     monkeypatch,
     mock_event,
     account_id,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Invoke the lambda handler with account_id variable in envvars."""
     wild_card = str(uuid.uuid4())
 
@@ -262,7 +260,7 @@ def test_lambda_handler_envvars_with_bad_vars(
     monkeypatch,
     mock_event,
     account_id,
-):  # pylint: disable=too-many-arguments
+):  # pylint: disable=too-many-arguments,too-many-positional-arguments
     """Invoke the lambda handler with account_id variable in envvars."""
     test_subject = "Subject with $unknown_var"
     monkeypatch.setenv("CC_LIST", "bar.com")

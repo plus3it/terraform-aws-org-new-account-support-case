@@ -18,13 +18,13 @@ data "aws_iam_policy_document" "lambda" {
 }
 
 module "lambda" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-lambda.git?ref=v7.7.1"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-lambda.git?ref=v7.20.2"
 
   function_name = local.name
 
   description = "Create new account support case - ${var.subject}"
   handler     = "new_account_support_case.lambda_handler"
-  runtime     = "python3.8"
+  runtime     = var.lambda.runtime
   timeout     = 300
   tags        = var.tags
 
