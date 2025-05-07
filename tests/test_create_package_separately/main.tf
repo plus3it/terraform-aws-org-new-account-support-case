@@ -6,7 +6,7 @@ module "test_create_package" {
 
   recreate_missing_package = false
 
-  runtime     = "python3.8"
+  runtime     = "python3.12"
   source_path = "${path.module}/../../lambda/src"
 }
 

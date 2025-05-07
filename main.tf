@@ -24,7 +24,7 @@ module "lambda" {
 
   description = "Create new account support case - ${var.subject}"
   handler     = "new_account_support_case.lambda_handler"
-  runtime     = "python3.8"
+  runtime     = var.lambda.runtime
   timeout     = 300
   tags        = var.tags
 
