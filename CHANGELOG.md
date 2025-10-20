@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/) and this project adheres to [Semantic Versioning](http://semver.org/).
 
+### [3.0.0](https://github.com/plus3it/terraform-aws-org-new-account-support-case/releases/tag/3.0.0)
+
+**Released**: 2025.10.20
+
+**Summary**:
+
+* Updates min aws provider version to v6
+
 ### [2.0.2](https://github.com/plus3it/terraform-aws-org-new-account-support-case/releases/tag/2.0.2)
 
 **Released**: 2025.05.07
