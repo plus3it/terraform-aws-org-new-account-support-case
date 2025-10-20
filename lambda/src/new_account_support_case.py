@@ -23,9 +23,9 @@ LOG = Logger(
     datefmt="%Y-%m-%dT%H:%M:%S",
 )
 
-LOCALSTACK_IP = os.getenv("LOCALSTACK_HOSTNAME")
-ORG_ENDPOINT = "http://localstack:4615" if LOCALSTACK_IP else None
-EDGE_ENDPOINT = "http://localstack:4566" if LOCALSTACK_IP else None
+
+MOCKSTACK_HOST = os.getenv("LOCALSTACK_HOST") or os.getenv("MOTO_HOST")
+MOCKSTACK_ENDPOINT = f"http://{MOCKSTACK_HOST}:4615" if MOCKSTACK_HOST else None
 
 
 ### Classes and functions specific to the Lambda event handler itself.
@@ -83,7 +83,7 @@ def main(account_id, cc_list, subject, communication_body):
     communication_body = template_to_string(communication_body, account_id)
 
     # Create the Enterprise support case.
-    support_client = boto3.client("support", endpoint_url=EDGE_ENDPOINT)
+    support_client = boto3.client("support", endpoint_url=MOCKSTACK_ENDPOINT)
     response = support_client.create_case(
         subject=subject,
         severityCode="low",
@@ -147,6 +147,7 @@ def lambda_handler(event, context):  # pylint: disable=unused-argument
             "CC_LIST": cc_list,
             "COMMUNICATION_BODY": communication_body,
             "SUBJECT": subject,
+            "MOCKSTACK_ENDPOINT": MOCKSTACK_ENDPOINT,
         }
     )
 
