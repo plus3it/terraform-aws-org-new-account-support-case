@@ -1,4 +1,3 @@
-ONLY_MOTO := true
 export PYTHONPATH := $(PYTHONPATH):./lambda/src
 AGENTS_PROFILE := terraform-module
 
